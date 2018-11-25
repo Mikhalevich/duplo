@@ -38,6 +38,14 @@ func makeBodyReader(files []string) (io.Reader, string, error) {
 	writer := multipart.NewWriter(body)
 
 	for _, fileName := range files {
+		fi, err := os.Stat(fileName)
+		if err != nil {
+			return nil, "", err
+		}
+		if fi.IsDir() {
+			continue
+		}
+
 		file, err := os.Open(fileName)
 		if err != nil {
 			return nil, "", err
@@ -64,7 +72,6 @@ func makeBodyReader(files []string) (io.Reader, string, error) {
 }
 
 func Upload(url string, files []string) error {
-	fmt.Println(url)
 	body, contentType, err := makeBodyReader(files)
 	if err != nil {
 		return err
