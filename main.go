@@ -1,21 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
-	"mime/multipart"
-	"net/http"
-	"os"
-	"path/filepath"
+	"net/url"
+	"path"
 
 	"github.com/Mikhalevich/argparser"
-)
-
-const (
-	uploadPathTemplate          = "%s/upload/"
-	uploadPermanentPathTemplate = "%s/permanent/upload/"
+	"github.com/Mikhalevich/duplo/commands"
 )
 
 type Params struct {
@@ -33,13 +25,37 @@ func NewParams() *Params {
 	}
 }
 
-func (p *Params) uploadURL() string {
-	template := uploadPathTemplate
-	if p.isPermanent {
-		template = uploadPermanentPathTemplate
+func join(base string, elem ...string) string {
+	u, err := url.Parse(base)
+	if err != nil {
+		fmt.Println(err)
 	}
-	path := fmt.Sprintf(template, p.Storage)
-	return fmt.Sprintf("%s/%s", p.Host, path)
+	for _, e := range elem {
+		u.Path = path.Join(u.Path, e)
+	}
+
+	resURL := u.String()
+	if resURL[:len(resURL)-1] != "/" {
+		resURL = fmt.Sprintf("%s/", resURL)
+	}
+	return resURL
+
+}
+
+func (p *Params) makeBaseURL() string {
+	u := join(p.Host, p.Storage)
+	if p.isPermanent {
+		u = join(u, "permanent")
+	}
+	return u
+}
+
+func (p *Params) uploadURL() string {
+	return join(p.makeBaseURL(), "upload")
+}
+
+func (p *Params) downloadURL(fileName string) string {
+	return join(p.makeBaseURL(), fileName)
 }
 
 func (p *Params) files() ([]string, error) {
@@ -53,6 +69,44 @@ func (p *Params) files() ([]string, error) {
 	}
 
 	return files, nil
+}
+
+func (p *Params) download() error {
+	file, err := commands.Download(p.downloadURL(argparser.Arg(1)))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Downloaded: %s\n", file)
+	return nil
+}
+
+func (p *Params) upload() error {
+	files, err := p.files()
+	if err != nil {
+		return err
+	}
+	err = commands.Upload(p.uploadURL(), files)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Uploaded...")
+	return nil
+}
+
+func (p *Params) runCommand() error {
+	switch p.command {
+	case "list":
+		return errors.New("not implemented yet")
+
+	case "get":
+		return p.download()
+
+	case "push":
+		return p.upload()
+	}
+
+	return fmt.Errorf("Unknown commnad %s", p.command)
 }
 
 func loadParams() (*Params, error) {
@@ -95,83 +149,6 @@ func loadParams() (*Params, error) {
 	return p, err
 }
 
-func runCommand(params *Params) error {
-	switch params.command {
-	case "list":
-		return errors.New("not implemented yet")
-
-	case "get":
-		return errors.New("not implemented yet")
-
-	case "push":
-		files, err := params.files()
-		if err != nil {
-			return err
-		}
-		return upload(params.uploadURL(), files)
-	}
-
-	return fmt.Errorf("Unknown commnad %s", params.command)
-}
-
-func makeBodyReader(files []string) (io.Reader, string, error) {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	for _, fileName := range files {
-		file, err := os.Open(fileName)
-		if err != nil {
-			return nil, "", err
-		}
-
-		baseName := filepath.Base(fileName)
-		part, err := writer.CreateFormFile(baseName, baseName)
-		if err != nil {
-			return nil, "", err
-		}
-
-		_, err = io.Copy(part, file)
-		if err != nil {
-			return nil, "", err
-		}
-	}
-
-	err := writer.Close()
-	if err != nil {
-		return nil, "", err
-	}
-
-	return body, writer.FormDataContentType(), nil
-}
-
-func upload(url string, files []string) error {
-	body, contentType, err := makeBodyReader(files)
-	if err != nil {
-		return err
-	}
-
-	request, err := http.NewRequest(http.MethodPost, url, body)
-	if err != nil {
-		return err
-	}
-
-	request.Header.Set("Content-Type", contentType)
-	request.Close = true
-
-	client := http.Client{}
-	response, err := client.Do(request)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("Unable to upload file: %s", response.Status)
-	}
-
-	return nil
-}
-
 func main() {
 	p, err := loadParams()
 	if err != nil {
@@ -179,7 +156,7 @@ func main() {
 		return
 	}
 
-	err = runCommand(p)
+	err = p.runCommand()
 	if err != nil {
 		fmt.Println(err)
 		return
