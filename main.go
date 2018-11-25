@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"strconv"
 
 	"github.com/Mikhalevich/argparser"
 	"github.com/Mikhalevich/duplo/commands"
@@ -50,6 +51,14 @@ func (p *Params) makeBaseURL() string {
 	return u
 }
 
+func (p *Params) listURL() string {
+	u := join(p.Host, "api", p.Storage)
+	if p.isPermanent {
+		u = join(u, "permanent")
+	}
+	return u
+}
+
 func (p *Params) uploadURL() string {
 	return join(p.makeBaseURL(), "upload")
 }
@@ -71,12 +80,58 @@ func (p *Params) files() ([]string, error) {
 	return files, nil
 }
 
-func (p *Params) download() error {
-	file, err := commands.Download(p.downloadURL(argparser.Arg(1)))
+func (p *Params) list() error {
+	files, err := commands.List(p.listURL())
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Downloaded: %s\n", file)
+
+	for i, f := range files {
+		fmt.Printf("%d => %s\n", i+1, f.Name)
+	}
+
+	return nil
+}
+
+func (p *Params) download() error {
+	numbers, err := p.files()
+	if err != nil {
+		return err
+	}
+
+	files, err := commands.List(p.listURL())
+	if err != nil {
+		return err
+	}
+
+	processed := make(map[int]bool)
+
+	for _, numStr := range numbers {
+		number, err := strconv.Atoi(numStr)
+		if err != nil {
+			fmt.Printf("Invalid number %s\n", numStr)
+			continue
+		}
+
+		if (number <= 0) || (number > len(files)) {
+			fmt.Printf("No file with index %d\n", number)
+			continue
+		}
+
+		if processed[number] {
+			fmt.Printf("Already processed %d\n", number)
+			continue
+		}
+
+		file, err := commands.Download(p.downloadURL(files[number-1].Name))
+		if err != nil {
+			return err
+		}
+
+		processed[number] = true
+		fmt.Printf("Downloaded: %s\n", file)
+	}
+
 	return nil
 }
 
@@ -97,7 +152,7 @@ func (p *Params) upload() error {
 func (p *Params) runCommand() error {
 	switch p.command {
 	case "list":
-		return errors.New("not implemented yet")
+		return p.list()
 
 	case "get":
 		return p.download()

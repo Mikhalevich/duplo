@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -10,6 +11,27 @@ import (
 	"path/filepath"
 	"strings"
 )
+
+type FileInfo struct {
+	Name string `json:"name"`
+}
+
+func List(url string) ([]FileInfo, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return []FileInfo{}, err
+	}
+	defer resp.Body.Close()
+
+	files := make([]FileInfo, 0, 0)
+	r := json.NewDecoder(resp.Body)
+	err = r.Decode(&files)
+	if err != nil {
+		return []FileInfo{}, err
+	}
+
+	return files, nil
+}
 
 func makeBodyReader(files []string) (io.Reader, string, error) {
 	body := &bytes.Buffer{}
@@ -76,6 +98,7 @@ func makeFileName(url string) (string, error) {
 	}
 
 	fileName := url[strings.LastIndex(url, "/")+1:]
+	baseName := fileName
 
 	counter := 0
 	for {
@@ -88,7 +111,7 @@ func makeFileName(url string) (string, error) {
 			return "", err
 		}
 
-		fileName = fmt.Sprintf("%s_%d", fileName, counter)
+		fileName = fmt.Sprintf("%s_%d", baseName, counter)
 		counter++
 	}
 
