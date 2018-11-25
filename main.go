@@ -14,45 +14,49 @@ import (
 )
 
 const (
-	URLTemplate          = "http://duplo/%s/upload/"
-	URLPermanentTemplate = "http://duplo/%s/permanent/upload/"
+	uploadPathTemplate          = "%s/upload/"
+	uploadPermanentPathTemplate = "%s/permanent/upload/"
 )
 
 type Params struct {
+	Host        string `json:"host"`
 	Storage     string `json:"storage"`
+	command     string
 	isPermanent bool
-	files       []string
 }
 
 func NewParams() *Params {
 	return &Params{
+		Host:        "http://duplo",
 		Storage:     "common",
 		isPermanent: false,
 	}
 }
 
-func (p *Params) url() string {
-	template := URLTemplate
+func (p *Params) uploadURL() string {
+	template := uploadPathTemplate
 	if p.isPermanent {
-		template = URLPermanentTemplate
+		template = uploadPermanentPathTemplate
 	}
-	return fmt.Sprintf(template, p.Storage)
+	path := fmt.Sprintf(template, p.Storage)
+	return fmt.Sprintf("%s/%s", p.Host, path)
 }
 
-func (p *Params) parseFiles() error {
-	if argparser.NArg() <= 0 {
-		return errors.New("No files for upload specified")
+func (p *Params) files() ([]string, error) {
+	if argparser.NArg() <= 1 {
+		return []string{}, errors.New("No files for upload specified")
 	}
 
-	p.files = make([]string, 0, argparser.NArg())
-	for i := 0; i < argparser.NArg(); i++ {
-		p.files = append(p.files, argparser.Arg(i))
+	files := make([]string, 0, argparser.NArg())
+	for i := 1; i < argparser.NArg(); i++ {
+		files = append(files, argparser.Arg(i))
 	}
 
-	return nil
+	return files, nil
 }
 
 func loadParams() (*Params, error) {
+	host := argparser.String("h", "", "host")
 	storage := argparser.String("s", "", "storage name to upload")
 	isPermanent := argparser.Bool("p", false, "user permanent storage")
 
@@ -64,9 +68,15 @@ func loadParams() (*Params, error) {
 	}
 
 	p := params.(*Params)
-	err = p.parseFiles()
-	if err != nil {
-		return nil, err
+
+	if argparser.NArg() <= 0 {
+		return nil, errors.New("No command specified")
+	}
+
+	p.command = argparser.Arg(0)
+
+	if *host != "" {
+		p.Host = *host
 	}
 
 	if *storage != "" {
@@ -74,7 +84,34 @@ func loadParams() (*Params, error) {
 	}
 	p.isPermanent = *isPermanent
 
+	if p.Host == "" {
+		return nil, errors.New("Host is invalid")
+	}
+
+	if p.Storage == "" {
+		return nil, errors.New("Storage name is invalid")
+	}
+
 	return p, err
+}
+
+func runCommand(params *Params) error {
+	switch params.command {
+	case "list":
+		return errors.New("not implemented yet")
+
+	case "get":
+		return errors.New("not implemented yet")
+
+	case "push":
+		files, err := params.files()
+		if err != nil {
+			return err
+		}
+		return upload(params.uploadURL(), files)
+	}
+
+	return fmt.Errorf("Unknown commnad %s", params.command)
 }
 
 func makeBodyReader(files []string) (io.Reader, string, error) {
@@ -107,13 +144,13 @@ func makeBodyReader(files []string) (io.Reader, string, error) {
 	return body, writer.FormDataContentType(), nil
 }
 
-func upload(params *Params) error {
-	body, contentType, err := makeBodyReader(params.files)
+func upload(url string, files []string) error {
+	body, contentType, err := makeBodyReader(files)
 	if err != nil {
 		return err
 	}
 
-	request, err := http.NewRequest(http.MethodPost, params.url(), body)
+	request, err := http.NewRequest(http.MethodPost, url, body)
 	if err != nil {
 		return err
 	}
@@ -142,7 +179,7 @@ func main() {
 		return
 	}
 
-	err = upload(p)
+	err = runCommand(p)
 	if err != nil {
 		fmt.Println(err)
 		return
