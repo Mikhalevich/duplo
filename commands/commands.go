@@ -17,6 +17,11 @@ type FileInfo struct {
 	Name string `json:"name"`
 }
 
+func errorMessage(reader io.Reader) string {
+	message, _ := ioutil.ReadAll(reader)
+	return string(message)
+}
+
 func List(url string) ([]FileInfo, error) {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -94,7 +99,7 @@ func Upload(url string, files []string) error {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("Unable to upload file: %s", response.Status)
+		return fmt.Errorf("Unable to upload file: %s", errorMessage(response.Body))
 	}
 
 	return nil
@@ -134,7 +139,7 @@ func Download(url string) (string, error) {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Unable to download file: %s", response.Status)
+		return "", fmt.Errorf("Unable to download file: %s", errorMessage(response.Body))
 	}
 
 	fileName, err := makeFileName(response.Request.URL.String())
@@ -174,9 +179,7 @@ func Delete(url string, paramName string, paramValue string) error {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		mes, _ := ioutil.ReadAll(response.Body)
-		fmt.Println(string(mes))
-		return fmt.Errorf("Unable to delete file: %s", response.Status)
+		return fmt.Errorf("Unable to delete file: %s", errorMessage(response.Body))
 	}
 
 	return nil
