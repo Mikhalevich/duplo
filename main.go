@@ -67,6 +67,10 @@ func (p *Params) downloadURL(fileName string) string {
 	return join(p.makeBaseURL(), fileName)
 }
 
+func (p *Params) deleteURL() string {
+	return join(p.makeBaseURL(), "remove")
+}
+
 func (p *Params) files() ([]string, error) {
 	if argparser.NArg() <= 1 {
 		return []string{}, errors.New("No files for upload specified")
@@ -93,7 +97,7 @@ func (p *Params) list() error {
 	return nil
 }
 
-func (p *Params) download() error {
+func (p *Params) runNumberCommand(f func(fileName string) error) error {
 	numbers, err := p.files()
 	if err != nil {
 		return err
@@ -123,16 +127,28 @@ func (p *Params) download() error {
 			continue
 		}
 
-		file, err := commands.Download(p.downloadURL(files[number-1].Name))
+		err = f(files[number-1].Name)
 		if err != nil {
 			return err
 		}
 
 		processed[number] = true
-		fmt.Printf("Downloaded: %s\n", file)
 	}
 
 	return nil
+}
+
+func (p *Params) download() error {
+	f := func(fileName string) error {
+		file, err := commands.Download(p.downloadURL(fileName))
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Downloaded: %s\n", file)
+		return nil
+	}
+
+	return p.runNumberCommand(f)
 }
 
 func (p *Params) upload() error {
@@ -149,6 +165,19 @@ func (p *Params) upload() error {
 	return nil
 }
 
+func (p *Params) delete() error {
+	f := func(fileName string) error {
+		err := commands.Delete(p.deleteURL(), "fileName", fileName)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Deleted: %s\n", fileName)
+		return nil
+	}
+
+	return p.runNumberCommand(f)
+}
+
 func (p *Params) runCommand() error {
 	switch p.command {
 	case "list":
@@ -159,6 +188,9 @@ func (p *Params) runCommand() error {
 
 	case "push":
 		return p.upload()
+
+	case "del":
+		return p.delete()
 	}
 
 	return fmt.Errorf("Unknown commnad %s", p.command)

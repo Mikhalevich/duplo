@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -152,4 +153,31 @@ func Download(url string) (string, error) {
 	}
 
 	return fileName, nil
+}
+
+func Delete(url string, paramName string, paramValue string) error {
+	bodyReader := strings.NewReader(fmt.Sprintf("%s=%s", paramName, paramValue))
+
+	request, err := http.NewRequest(http.MethodPost, url, bodyReader)
+	if err != nil {
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Close = true
+
+	client := http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		mes, _ := ioutil.ReadAll(response.Body)
+		fmt.Println(string(mes))
+		return fmt.Errorf("Unable to delete file: %s", response.Status)
+	}
+
+	return nil
 }
