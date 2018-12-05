@@ -164,6 +164,19 @@ func (p *Params) runCommand() error {
 	return fmt.Errorf("Unknown commnad %s", p.command)
 }
 
+func normalizeURL(baseURL string) (string, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+
+	if u.Scheme == "" {
+		baseURL = "http://" + baseURL
+	}
+
+	return baseURL, nil
+}
+
 func loadParams() (*Params, error) {
 	host := argparser.String("h", "", "host")
 	storage := argparser.String("s", "", "storage name to upload")
@@ -185,7 +198,11 @@ func loadParams() (*Params, error) {
 	p.command = argparser.Arg(0)
 
 	if *host != "" {
-		p.Host = *host
+		u, err := normalizeURL(*host)
+		if err != nil {
+			return nil, err
+		}
+		p.Host = u
 	}
 
 	if *storage != "" {
