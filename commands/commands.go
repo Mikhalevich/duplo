@@ -160,8 +160,13 @@ func Download(url string) (string, error) {
 	return fileName, nil
 }
 
-func Delete(url string, paramName string, paramValue string) error {
-	bodyReader := strings.NewReader(fmt.Sprintf("%s=%s", paramName, paramValue))
+func PostRequest(url string, params map[string]string) error {
+	paramList := make([]string, len(params))
+	for key, value := range params {
+		paramList = append(paramList, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	bodyReader := strings.NewReader(strings.Join(paramList, "&"))
 
 	request, err := http.NewRequest(http.MethodPost, url, bodyReader)
 	if err != nil {
@@ -179,7 +184,7 @@ func Delete(url string, paramName string, paramValue string) error {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("Unable to delete file: %s", errorMessage(response.Body))
+		return fmt.Errorf("Unable to make post request: %s", errorMessage(response.Body))
 	}
 
 	return nil

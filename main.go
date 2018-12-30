@@ -71,6 +71,10 @@ func (p *Params) deleteURL() string {
 	return join(p.makeBaseURL(), "remove")
 }
 
+func (p *Params) shareTextURL() string {
+	return join(p.makeBaseURL(), "shareText")
+}
+
 func (p *Params) files() ([]string, error) {
 	if argparser.NArg() <= 1 {
 		return []string{}, errors.New("No files for upload specified")
@@ -167,7 +171,7 @@ func (p *Params) upload() error {
 
 func (p *Params) delete() error {
 	f := func(fileName string) error {
-		err := commands.Delete(p.deleteURL(), "fileName", fileName)
+		err := commands.PostRequest(p.deleteURL(), map[string]string{"fileName": fileName})
 		if err != nil {
 			return err
 		}
@@ -176,6 +180,29 @@ func (p *Params) delete() error {
 	}
 
 	return p.runNumberCommand(f)
+}
+
+func (p *Params) text() error {
+	arguments, err := p.files()
+	if err != nil {
+		return err
+	}
+
+	if len(arguments) < 2 {
+		return errors.New("No <title> or <body> parametes provided")
+	}
+
+	params := make(map[string]string)
+	params["title"] = arguments[0]
+	params["body"] = arguments[1]
+
+	err = commands.PostRequest(p.shareTextURL(), params)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Text uploaded...")
+	return nil
 }
 
 func (p *Params) runCommand() error {
@@ -191,6 +218,9 @@ func (p *Params) runCommand() error {
 
 	case "del":
 		return p.delete()
+
+	case "text":
+		return p.text()
 	}
 
 	return fmt.Errorf("Unknown commnad %s", p.command)
