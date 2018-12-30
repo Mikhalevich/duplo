@@ -16,6 +16,7 @@ type Params struct {
 	Storage     string `json:"storage"`
 	command     string
 	isPermanent bool
+	view        bool
 }
 
 func NewParams() *Params {
@@ -23,6 +24,7 @@ func NewParams() *Params {
 		Host:        "http://duplo",
 		Storage:     "common",
 		isPermanent: false,
+		view:        false,
 	}
 }
 
@@ -144,11 +146,21 @@ func (p *Params) runNumberCommand(f func(fileName string) error) error {
 
 func (p *Params) download() error {
 	f := func(fileName string) error {
-		file, err := commands.Download(p.downloadURL(fileName))
+		var s commands.Storer
+		if p.view {
+			s = commands.NewConsoleStorer()
+		} else {
+			s = commands.NewFileStorer(fileName)
+		}
+
+		file, err := commands.GetFile(p.downloadURL(fileName), s)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Downloaded: %s\n", file)
+
+		if !p.view {
+			fmt.Printf("Downloaded: %s\n", file)
+		}
 		return nil
 	}
 
@@ -243,6 +255,7 @@ func loadParams() (*Params, error) {
 	host := argparser.String("h", "", "host")
 	storage := argparser.String("s", "", "storage name to upload")
 	isPermanent := argparser.Bool("p", false, "user permanent storage")
+	view := argparser.Bool("v", false, "view file contents. Option is used for get command only")
 
 	basicParams := NewParams()
 	params, err, gen := argparser.Parse(basicParams)
@@ -271,6 +284,7 @@ func loadParams() (*Params, error) {
 		p.Storage = *storage
 	}
 	p.isPermanent = *isPermanent
+	p.view = *view
 
 	if p.Host == "" {
 		return nil, errors.New("Host is invalid")

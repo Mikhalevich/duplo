@@ -105,33 +105,7 @@ func Upload(url string, files []string) error {
 	return nil
 }
 
-func makeFileName(url string) (string, error) {
-	if strings.HasSuffix(url, "/") {
-		url = url[:len(url)-1]
-	}
-
-	fileName := url[strings.LastIndex(url, "/")+1:]
-	baseName := fileName
-
-	counter := 0
-	for {
-		_, err := os.Open(fileName)
-		if os.IsNotExist(err) {
-			break
-		}
-
-		if err != nil {
-			return "", err
-		}
-
-		fileName = fmt.Sprintf("%s_%d", baseName, counter)
-		counter++
-	}
-
-	return fileName, nil
-}
-
-func Download(url string) (string, error) {
+func GetFile(url string, s Storer) (string, error) {
 	response, err := http.Get(url)
 	if err != nil {
 		return "", err
@@ -139,25 +113,10 @@ func Download(url string) (string, error) {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Unable to download file: %s", errorMessage(response.Body))
+		return "", fmt.Errorf("Unable to get file: %s", errorMessage(response.Body))
 	}
 
-	fileName, err := makeFileName(response.Request.URL.String())
-	if err != nil {
-		return "", err
-	}
-
-	f, err := os.Create(fileName)
-	if err != nil {
-		return "", err
-	}
-
-	_, err = io.Copy(f, response.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return fileName, nil
+	return s.Store(response.Body)
 }
 
 func PostRequest(url string, params map[string]string) error {
