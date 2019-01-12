@@ -240,7 +240,12 @@ func loadParams() (*Params, error) {
 	isPermanent := parser.Bool("p", false, "user permanent storage")
 	view := parser.Bool("v", false, "view file contents. Option is used for get command only")
 
-	parser.AddCommands([]string{"list", "get", "push", "del", "text"})
+	commands := map[string]string{"list": "get file list on current storage. Use -s parameter to specify storage name(common by default)",
+		"get":  "Download files by index(see list command) from current storage. (duplo get 1 2 3, duplo -v get 4 5)",
+		"push": "Upload files to current storage. (duplo push [file names])",
+		"del":  "Delete files by index(see list command) from current storage. (duplo del 1 2)",
+		"text": "Upload text message to current storage. (duplo text [description] [content])"}
+	parser.AddCommands(commands)
 
 	basicParams := NewParams()
 	params, err, gen := parser.Parse(basicParams)
@@ -250,7 +255,7 @@ func loadParams() (*Params, error) {
 	}
 
 	p := params.(*Params)
-	p.command = parser.CurrentCommand
+	p.command = parser.Command()
 	p.arguments = parser.Arguments()
 
 	if *host != "" {
