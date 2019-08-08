@@ -8,9 +8,9 @@ import (
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type FileInfo struct {
@@ -119,8 +119,8 @@ func GetFile(url string, s Storer) (string, error) {
 	return s.Store(response.Body)
 }
 
-func PostRequest(url string, params map[string]string) error {
-	paramList := make([]string, len(params))
+func PostRequest(urlStr string, params map[string]string) error {
+	/*paramList := make([]string, len(params))
 	for key, value := range params {
 		paramList = append(paramList, fmt.Sprintf("%s=%s", key, value))
 	}
@@ -137,6 +137,13 @@ func PostRequest(url string, params map[string]string) error {
 
 	client := http.Client{}
 	response, err := client.Do(request)
+	*/
+
+	postValues := url.Values{}
+	for key, value := range params {
+		postValues.Set(key, value)
+	}
+	response, err := http.PostForm(urlStr, postValues)
 	if err != nil {
 		return err
 	}
