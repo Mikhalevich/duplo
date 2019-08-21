@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/Mikhalevich/argparser"
 	"github.com/Mikhalevich/duplo/commands"
@@ -187,7 +188,7 @@ func (p *Params) text() error {
 	}
 
 	params := make(map[string]string)
-	params["title"] = p.arguments[0]
+	params["title"] = strings.ReplaceAll(p.arguments[0], "/", "")
 	params["body"] = p.arguments[1]
 
 	err := commands.PostRequest(p.shareTextURL(), params)
