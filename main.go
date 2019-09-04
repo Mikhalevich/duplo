@@ -23,7 +23,7 @@ type Params struct {
 
 func NewParams() *Params {
 	return &Params{
-		Host:        "http://duplo",
+		Host:        "http://duplo.viberlab.com",
 		Storage:     "common",
 		isPermanent: false,
 		view:        false,
