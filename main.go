@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -288,12 +289,14 @@ func main() {
 	p, err := loadParams()
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1)
 		return
 	}
 
 	err = p.runCommand()
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1)
 		return
 	}
 
