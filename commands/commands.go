@@ -1,16 +1,12 @@
 package commands
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 )
 
 type FileInfo struct {
@@ -39,50 +35,7 @@ func List(url string) ([]FileInfo, error) {
 	return files, nil
 }
 
-func makeBodyReader(files []string) (io.Reader, string, error) {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	for _, fileName := range files {
-		fi, err := os.Stat(fileName)
-		if err != nil {
-			return nil, "", err
-		}
-		if fi.IsDir() {
-			continue
-		}
-
-		file, err := os.Open(fileName)
-		if err != nil {
-			return nil, "", err
-		}
-
-		baseName := filepath.Base(fileName)
-		part, err := writer.CreateFormFile(baseName, baseName)
-		if err != nil {
-			return nil, "", err
-		}
-
-		_, err = io.Copy(part, file)
-		if err != nil {
-			return nil, "", err
-		}
-	}
-
-	err := writer.Close()
-	if err != nil {
-		return nil, "", err
-	}
-
-	return body, writer.FormDataContentType(), nil
-}
-
-func Upload(url string, files []string) error {
-	body, contentType, err := makeBodyReader(files)
-	if err != nil {
-		return err
-	}
-
+func Upload(url string, body io.Reader, contentType string) error {
 	request, err := http.NewRequest(http.MethodPost, url, body)
 	if err != nil {
 		return err

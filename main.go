@@ -1,16 +1,22 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/Mikhalevich/argparser"
 	"github.com/Mikhalevich/duplo/commands"
+	"github.com/Mikhalevich/iowatcher"
+	"github.com/Mikhalevich/pbw"
 )
 
 type Params struct {
@@ -156,12 +162,68 @@ func (p *Params) download() error {
 	return p.runNumberCommand(f)
 }
 
+func makeUploadReader(files []string) (io.Reader, string, int64, error) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	var size int64
+
+	for _, fileName := range files {
+		fi, err := os.Stat(fileName)
+		if err != nil {
+			return nil, "", 0, err
+		}
+		if fi.IsDir() {
+			continue
+		}
+
+		size += fi.Size()
+
+		file, err := os.Open(fileName)
+		if err != nil {
+			return nil, "", 0, err
+		}
+
+		baseName := filepath.Base(fileName)
+		part, err := writer.CreateFormFile(baseName, baseName)
+		if err != nil {
+			return nil, "", 0, err
+		}
+
+		_, err = io.Copy(part, file)
+		if err != nil {
+			return nil, "", 0, err
+		}
+	}
+
+	err := writer.Close()
+	if err != nil {
+		return nil, "", 0, err
+	}
+
+	return body, writer.FormDataContentType(), size, nil
+}
+
 func (p *Params) upload() error {
 	if len(p.arguments) <= 0 {
 		return errors.New("No files specified")
 	}
 
-	err := commands.Upload(p.uploadURL(), p.arguments)
+	ur, contentType, size, err := makeUploadReader(p.arguments)
+	if err != nil {
+		return err
+	}
+
+	rw := iowatcher.NewReadWatcher(ur)
+	notifier := make(chan int64)
+	go func() {
+		for v := range rw.Notifier() {
+			notifier <- int64(v)
+		}
+		close(notifier)
+	}()
+	pbw.ShowWithMax(notifier, size)
+
+	err = commands.Upload(p.uploadURL(), rw, contentType)
 	if err != nil {
 		return err
 	}
