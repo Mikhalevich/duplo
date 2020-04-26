@@ -1,15 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -86,8 +84,18 @@ func (p *Params) shareTextURL() string {
 	return join(p.makeBaseURL(), "shareText")
 }
 
+func (p *Params) files() ([]commands.FileInfo, error) {
+	view := commands.NewView(p.listURL())
+	err := view.Do()
+	if err != nil {
+		return []commands.FileInfo{}, err
+	}
+
+	return view.Files(), nil
+}
+
 func (p *Params) list() error {
-	files, err := commands.List(p.listURL())
+	files, err := p.files()
 	if err != nil {
 		return err
 	}
@@ -104,7 +112,7 @@ func (p *Params) runNumberCommand(f func(fileName string) error) error {
 		return errors.New("No files specified")
 	}
 
-	files, err := commands.List(p.listURL())
+	files, err := p.files()
 	if err != nil {
 		return err
 	}
@@ -139,22 +147,50 @@ func (p *Params) runNumberCommand(f func(fileName string) error) error {
 	return nil
 }
 
+func (p *Params) downloadContentLength(fileName string) (int64, error) {
+	response, err := http.Head(p.downloadURL(fileName))
+	if err != nil {
+		return 0, errors.New("Unable to determine content length")
+	}
+	defer response.Body.Close()
+	return response.ContentLength, nil
+}
+
 func (p *Params) download() error {
 	f := func(fileName string) error {
-		var s commands.Storer
+		var w io.WriteCloser
 		if p.view {
-			s = commands.NewConsoleStorer()
+			w = commands.NewConsoleWriter()
 		} else {
-			s = commands.NewFileStorer(fileName)
+			w = commands.NewFileWriter(fileName)
 		}
 
-		file, err := commands.GetFile(p.downloadURL(fileName), s)
+		var ww io.Writer = w
+
+		cl, err := p.downloadContentLength(fileName)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(cl)
+		if cl > 0 {
+			ww := iowatcher.NewWriteWatcher(w)
+			notifier := make(chan int64)
+			go func() {
+				for v := range ww.Notifier() {
+					notifier <- int64(v)
+				}
+				close(notifier)
+			}()
+			pbw.ShowWithMax(notifier, cl)
+		}
+
+		err = commands.NewDownload(p.downloadURL(fileName), ww).Do()
 		if err != nil {
 			return err
 		}
 
 		if !p.view {
-			fmt.Printf("Downloaded: %s\n", file)
+			fmt.Printf("Downloaded: %s\n", w.(*commands.FileWriter).FileName())
 		}
 		return nil
 	}
@@ -162,58 +198,17 @@ func (p *Params) download() error {
 	return p.runNumberCommand(f)
 }
 
-func makeUploadReader(files []string) (io.Reader, string, int64, error) {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	var size int64
-
-	for _, fileName := range files {
-		fi, err := os.Stat(fileName)
-		if err != nil {
-			return nil, "", 0, err
-		}
-		if fi.IsDir() {
-			continue
-		}
-
-		size += fi.Size()
-
-		file, err := os.Open(fileName)
-		if err != nil {
-			return nil, "", 0, err
-		}
-
-		baseName := filepath.Base(fileName)
-		part, err := writer.CreateFormFile(baseName, baseName)
-		if err != nil {
-			return nil, "", 0, err
-		}
-
-		_, err = io.Copy(part, file)
-		if err != nil {
-			return nil, "", 0, err
-		}
-	}
-
-	err := writer.Close()
-	if err != nil {
-		return nil, "", 0, err
-	}
-
-	return body, writer.FormDataContentType(), size, nil
-}
-
 func (p *Params) upload() error {
 	if len(p.arguments) <= 0 {
 		return errors.New("No files specified")
 	}
 
-	ur, contentType, size, err := makeUploadReader(p.arguments)
+	mr, contentType, size, err := commands.MakeMultipartReader(p.arguments)
 	if err != nil {
 		return err
 	}
 
-	rw := iowatcher.NewReadWatcher(ur)
+	rw := iowatcher.NewReadWatcher(mr)
 	notifier := make(chan int64)
 	go func() {
 		for v := range rw.Notifier() {
@@ -223,7 +218,7 @@ func (p *Params) upload() error {
 	}()
 	pbw.ShowWithMax(notifier, size)
 
-	err = commands.Upload(p.uploadURL(), rw, contentType)
+	err = commands.NewUpload(p.uploadURL(), rw, contentType).Do()
 	if err != nil {
 		return err
 	}
@@ -234,7 +229,7 @@ func (p *Params) upload() error {
 
 func (p *Params) delete() error {
 	f := func(fileName string) error {
-		err := commands.PostRequest(p.deleteURL(), map[string]string{"fileName": fileName})
+		err := commands.NewDelete(p.deleteURL(), fileName).Do()
 		if err != nil {
 			return err
 		}
@@ -250,11 +245,7 @@ func (p *Params) text() error {
 		return errors.New("No <title> or <body> parametes provided")
 	}
 
-	params := make(map[string]string)
-	params["title"] = strings.ReplaceAll(p.arguments[0], "/", "")
-	params["body"] = p.arguments[1]
-
-	err := commands.PostRequest(p.shareTextURL(), params)
+	err := commands.NewText(p.shareTextURL(), strings.ReplaceAll(p.arguments[0], "/", ""), p.arguments[1]).Do()
 	if err != nil {
 		return err
 	}
