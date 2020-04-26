@@ -1,7 +1,8 @@
 github.com/Mikhalevich/argparser v0.0.0-20190112163910-518e0f794423 h1:fzjd5TEWZ9QE0D7F3ipfEgQ433qDDHQEqi3d6sEfNdw=
 github.com/Mikhalevich/argparser v0.0.0-20190112163910-518e0f794423/go.mod h1:ObPRNseyr/wy5XSBRrkZmm+YQqDgNvjpWoTEstcAiAg=
-github.com/Mikhalevich/iowatcher v0.0.0-20200426221901-dfa100d6ed5c h1:T588qnhHfZwHMB8j4KJRBY0e2CdRvYlBKEXUpfQjkOI=
 github.com/Mikhalevich/iowatcher v0.0.0-20200426221901-dfa100d6ed5c/go.mod h1:d23lq2i3dE02F7tYcK4OP7y9iCHvTds00+0rZGfE7aE=
+github.com/Mikhalevich/iowatcher v0.0.0-20200426230705-a2bf0443f87d h1:9xe1lHwEgr+bjF/K6Ht51wSaFIf9tJUBypCnS8FZ6bU=
+github.com/Mikhalevich/iowatcher v0.0.0-20200426230705-a2bf0443f87d/go.mod h1:d23lq2i3dE02F7tYcK4OP7y9iCHvTds00+0rZGfE7aE=
 github.com/Mikhalevich/pbw v0.0.0-20190906100704-967325f59c6b h1:EuzBEo8Ui5me8/4+q3EBjx36OkY67YXfGqtghF42+pk=
 github.com/Mikhalevich/pbw v0.0.0-20190906100704-967325f59c6b/go.mod h1:ezvI2fRlfEy8MdtmyMygoVTVvg2KRtLe+1d6iZ61KJA=
 github.com/VividCortex/ewma v1.1.1 h1:MnEK4VOv6n0RSY4vtRe3h11qjxL3+t0B8yOL8iMXdcM=

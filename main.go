@@ -156,41 +156,45 @@ func (p *Params) downloadContentLength(fileName string) (int64, error) {
 	return response.ContentLength, nil
 }
 
+func (p *Params) downloadWriter(fileName string) (io.Writer, io.Writer) {
+	var w io.WriteCloser
+	if p.view {
+		w = commands.NewConsoleWriter()
+	} else {
+		w = commands.NewFileWriter(fileName)
+	}
+
+	cl, err := p.downloadContentLength(fileName)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	if cl <= 0 {
+		return w, w
+	}
+
+	ww := iowatcher.NewWriteWatcher(w)
+	notifier := make(chan int64)
+	go func() {
+		for v := range ww.Notifier() {
+			notifier <- int64(v)
+		}
+		close(notifier)
+	}()
+	pbw.ShowWithMax(notifier, cl)
+	return w, ww
+}
+
 func (p *Params) download() error {
 	f := func(fileName string) error {
-		var w io.WriteCloser
-		if p.view {
-			w = commands.NewConsoleWriter()
-		} else {
-			w = commands.NewFileWriter(fileName)
-		}
-
-		var ww io.Writer = w
-
-		cl, err := p.downloadContentLength(fileName)
-		if err != nil {
-			fmt.Println(err)
-		}
-		fmt.Println(cl)
-		if cl > 0 {
-			ww := iowatcher.NewWriteWatcher(w)
-			notifier := make(chan int64)
-			go func() {
-				for v := range ww.Notifier() {
-					notifier <- int64(v)
-				}
-				close(notifier)
-			}()
-			pbw.ShowWithMax(notifier, cl)
-		}
-
-		err = commands.NewDownload(p.downloadURL(fileName), ww).Do()
+		originWriter, wrappedWriter := p.downloadWriter(fileName)
+		err := commands.NewDownload(p.downloadURL(fileName), wrappedWriter).Do()
 		if err != nil {
 			return err
 		}
 
 		if !p.view {
-			fmt.Printf("Downloaded: %s\n", w.(*commands.FileWriter).FileName())
+			fmt.Printf("Downloaded: %s\n", originWriter.(*commands.FileWriter).FileName())
 		}
 		return nil
 	}

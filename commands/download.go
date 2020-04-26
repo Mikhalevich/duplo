@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"sync"
-	"time"
 )
 
 type FileWriter struct {
@@ -61,8 +60,6 @@ func (fw *FileWriter) Write(p []byte) (int, error) {
 	if fw.openFileErr != nil {
 		return 0, fw.openFileErr
 	}
-
-	time.Sleep(time.Millisecond * 10)
 
 	return fw.file.Write(p)
 }
